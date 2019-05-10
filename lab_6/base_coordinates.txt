@@ -1,0 +1,2 @@
+% Base coordinates (XYZ) in meters: 
+mpos = [4367900.641   502906.393  4605656.413];

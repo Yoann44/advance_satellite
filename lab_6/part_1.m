@@ -1,5 +1,6 @@
-close all
-clear
+close all;
+clear;
+clc;
 
 % Load rover observations
 load('datar.mat')
@@ -19,6 +20,9 @@ frequ_1 = 1575.42e6;
 frequ_2 = 1227.6e6;
 frequ_5 = 1176.45e6;
 
+%Deviation [m] for [C1 C5 L1 L5]
+std = [0.5 0.5 0.01 .01];
+
 %Speed of light [m/s]
 c = 299792458;
 
@@ -29,8 +33,30 @@ datam(:,6) = datam(:,6) * c / frequ_5;
 datar(:,5) = datar(:,5) * c / frequ_1;
 datar(:,6) = datar(:,6) * c / frequ_5;
 
-obs_master = zeros((max_tow - min_tow) * 4 * (np_of_sv - 1), 1);
-obs_rover = zeros((max_tow - min_tow) * 4 * (np_of_sv - 1), 1);
+obs_master = zeros((max_tow - min_tow), 4 * (np_of_sv - 1));
+obs_rover = zeros((max_tow - min_tow), 4 * (np_of_sv - 1));
+
+D = [
+    1  -1   -1  1   0   0   0   0   0   0   0   0   0   0   0   0
+    1  -1   0   0   -1  1   0   0   0   0   0   0   0   0   0   0
+    1  -1   0   0   0   0   -1  1   0   0   0   0   0   0   0   0
+    1  -1   0   0   0   0   0   0   -1  1   0   0   0   0   0   0
+    1  -1   0   0   0   0   0   0   0   0   -1  1   0   0   0   0
+    1  -1   0   0   0   0   0   0   0   0   0   0   -1  1   0   0
+    1  -1   0   0   0   0   0   0   0   0   0   0   0   0   -1  1
+    ];
+
+A = [   
+    1       0           0
+    1       0           0
+    1       c/frequ_1   0
+    1       0           c/frequ_5
+    ];
+
+P = diag(1./std.^2);
+N = A*A';
+D = N(3:4,3:4);
+N22 = (D - N(2:3,1)*N(1,2:3)/N(1,1));
 
 i = 0;
 for tow = min_tow:15:max_tow
@@ -54,20 +80,14 @@ for tow = min_tow:15:max_tow
     l(3:2:(size(datam_tow, 1) * 2 + 1),:) = datam_tow(:,3:6);
     l(4:2:(size(datam_tow, 1) * 2 + 2),:) = datar_tow(:,3:6);
     
-    D = [
-        1  -1   -1  1   0   0   0   0   0   0   0   0   0   0   0   0
-        1  -1   0   0   -1  1   0   0   0   0   0   0   0   0   0   0
-        1  -1   0   0   0   0   -1  1   0   0   0   0   0   0   0   0
-        1  -1   0   0   0   0   0   0   -1  1   0   0   0   0   0   0
-        1  -1   0   0   0   0   0   0   0   0   -1  1   0   0   0   0
-        1  -1   0   0   0   0   0   0   0   0   0   0   -1  1   0   0
-        1  -1   0   0   0   0   0   0   0   0   0   0   0   0   -1  1
-        ];
     ld = D*l;
+    
+    for le = ld'
+        b = A'*P*le;
+        b21 = (b(2)-N(2:3,1)*b(1)/N(1,1));
+        x21 = N22^-1*b21;
+    end
 end
-
-std = [0.5 0.5 0.01 .01]; %[m] for [C1 C5 L1 L5]
-obsw = std.^(-2);
 
 function [data_tow] = select_tow(data, tow)
     data_tow = data(data(:, 1) == tow, :);
